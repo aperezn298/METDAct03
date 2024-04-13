@@ -1,0 +1,91 @@
+body {
+    text-align: justify;
+}
+
+#navbar {
+    overflow: hidden;
+    background-color: #1E6BB8;
+}
+
+#navbar a {
+    float: left;
+    display: block;
+    color: #f2f2f2;
+    text-align: center;
+    padding: 14px 16px;
+    text-decoration: none;
+    font-size: 17px;
+}
+
+#navbar a:hover {
+    background-color: #04AA6D;
+    color: white;
+}
+
+#navbar a.active {
+    background-color: #04AA6D;
+    color: white;
+}
+
+.content {
+    padding: 16px;
+}
+
+.sticky {
+    position: fixed;
+    top: 0;
+    width: 100%;
+}
+
+.sticky+.content {
+    padding-top: 60px;
+}
+
+.active {
+    background-color: #04AA6D;
+}
+
+/* Style the tab */
+.tab {
+    overflow: hidden;
+    border: 1px solid #ccc;
+    background-color: #04AA6D;
+    color: white;
+    display: flex;
+    align-items: center;
+}
+
+/* Style the buttons inside the tab */
+.tab div {
+    background-color: inherit;
+    float: left;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    padding: 14px 16px;
+    transition: 0.3s;
+    font-size: 17px;
+}
+
+/* Change background color of buttons on hover */
+.tab div:hover {
+    background-color: #1E6BB8;
+}
+
+/* Create an active/current tablink class */
+.tab div.active {
+    background-color: #1E6BB8
+}
+
+/* Style the tab content */
+.tabcontent {
+    display: none;
+    padding: 6px 12px;
+    border: 1px solid #ccc;
+    border-top: none;
+}
+
+.tablinks {
+    padding: 1em;
+    cursor: pointer;
+}
