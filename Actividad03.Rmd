@@ -296,7 +296,7 @@ En las conclusiones adicione una discución sobre cuál sería la estrategia par
 
 ## 8. Anexos
 
-Código fuente --> [Clic Aquí](https://raw.githubusercontent.com/aperezn298/METDAct02/main/Actividad02.Rmd)
+Código fuente --> [Clic Aquí](https://raw.githubusercontent.com/aperezn298/METDAct03/main/Actividad03.Rmd)
 
 ***
 
