@@ -1,0 +1,314 @@
+---
+title: Rotación de cargo
+author: Alvaro Pérez Niño
+date: Marzo de 2024
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+    css: custom_styles.css
+---
+
+```{r D00, echo=FALSE}
+library(mice)
+library(ggplot2)
+require(ggpubr)
+require(plotly)
+library(pROC)
+```
+
+# Problemática
+
+En una organización, se busca comprender y prever los factores que influyen en la rotación de empleados entre distintos cargos. La empresa ha recopilado datos históricos sobre el empleo de sus trabajadores, incluyendo variables como la antigüedad en el cargo actual, el nivel de satisfacción laboral, el salario actual, edad y otros factores relevantes. La gerencia planea desarrollar un modelo de regresión logística que permita estimar la probabilidad de que un empleado cambie de cargo en el próximo período y determinar cuales factores indicen en mayor proporción a estos cambios.
+
+Con esta información, la empresa podrá tomar medidas proactivas para retener a su talento clave, identificar áreas de mejora en la gestión de recursos humanos y fomentar un ambiente laboral más estable y tranquilo. La predicción de la probabilidad de rotación de empleados ayudará a la empresa a tomar decisiones estratégicas informadas y a mantener un equipo de trabajo comprometido y satisfecho en sus roles actuales.
+
+
+## Data
+
+```{r D01, echo=TRUE}
+# Base de datos - Rotacion
+library(paqueteMODELOS)
+library(dplyr)
+data("rotacion")
+str(rotacion)
+```
+
+El dataset contiene 24 atributos y 1470 observaciones. De los cuales cuenta con 8 variables categoricas, 11 variables cuantitativas y 5 variables ordinales. Adicionalmente o se presenta perdida de informacion u observaciones incompletas:
+
+
+```{r D02, echo=TRUE}
+grafico <-md.pattern(rotacion, rotate.names = TRUE)
+```
+
+***
+
+
+# Solución
+
+## 1. Selección de variables
+
+Seleccione 3 variables categóricas (distintas de rotación) y 3 variables cuantitativas, que se consideren estén relacionadas con la rotación.
+
+### 1.1 Variables Categóricas
+
+- **Horas extra:** ```$Horas_Extra : chr [1:1470] "Si" "No" "Si" "Si" ... ```
+
+Se espera que los empleados que trabajan horas extras tengan una mayor probabilidad de rotación que las persona que no trabajan horas extras; debido a tienen menor tiempo para las actividades personales.
+
+- **Estado_Civil:** ```$Estado_Civil : chr [1:1470] "Soltero" "Casado" "Soltero" "Casado" ... ```
+
+Se espera que los empleados solteros o divorciados tengan una mayor probabilidad de rotación que los demás empleados casados debido a su estabilidad familiar y/o económica.
+
+- **Cargo:** ```$Cargo : chr [1:1470] "Ejecutivo_Ventas" "Investigador_Cientifico" "Tecnico_Laboratorio" ...```
+
+Se espera que los empleados con cargos de tipo operativo, presenten una mayor rotacion en comparacion a los cargos directivos por su naturaleza.
+
+
+### 1.2 Variables Cuantitativas
+
+- **Edad:** ```$Edad : num [1:1470] 41 49 37 33 27 32 59 30 38 36 ... ```
+
+Se espera que las personas jovenes presenten una mayor rotación en comparación de las personas mas adultas
+
+- **Años experiencia:** ```$Años_Experiencia : num [1:1470] 8 10 7 8 6 8 12 1 10 17 ...```
+
+se espera que las personas con menos años de experiencia presenten una mayor rotación en comparación con las personas con mas años de experiencia.
+
+- **Distancia Trabajo - Casa:** ```$Distancia_Casa : num [1:1470] 1 8 2 3 2 2 3 24 23 27 ... ```
+
+Se espera que las personas que viven a una mayor distancia del lugar trabajo roten en una mayor frecuencia en comparación con las personas que viven mas cerca al lugar de trabajo.
+
+***
+
+
+## 2. Análisis univariado
+
+Realiza un análisis univariado (caracterización) de la información contenida en la base de datos *rotacion*.
+
+### 2.1 Variables Categóricas
+
+```{r D03, echo=TRUE}
+Horas_Extra <- prop.table(table(rotacion$Horas_Extra)) * 100
+print(Horas_Extra)
+Estado_Civil <- prop.table(table(rotacion$Estado_Civil)) * 100
+print(Estado_Civil)
+Cargo <- prop.table(table(rotacion$Cargo)) * 100
+print(Cargo)
+```
+
+
+```{r D04, echo=TRUE}
+g1 = ggplot(rotacion, aes(x = Horas_Extra)) + geom_bar(fill="#1E6BB8") + theme_gray()
+g2 = ggplot(rotacion, aes(x = Estado_Civil)) + geom_bar(fill="#1E6BB8") + theme_gray()
+g3 = ggplot(rotacion, aes(x = Cargo)) + geom_bar(fill="#1E6BB8") + theme_gray() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+ggarrange(g1, g2, g3, ncol = 3, nrow = 1)
+```
+
+
+### 2.2 Variables Cuantitativas
+
+```{r D05, echo=TRUE}
+variables_cuan_resumir <- c("Edad", "Años_Experiencia", "Distancia_Casa")
+summary(rotacion[variables_cuan_resumir])
+```
+
+```{r D06, echo=TRUE}
+g4 = ggplot(rotacion, aes(x = Edad)) + geom_histogram(fill="#1E6BB8") + theme_gray()
+g5 = ggplot(rotacion, aes(x = Años_Experiencia)) + geom_histogram(fill="#1E6BB8") + theme_gray()
+g6 = ggplot(rotacion, aes(x = Distancia_Casa)) + geom_histogram(fill="#1E6BB8") + theme_gray()
+ggarrange(g4, g5, g6, ncol = 3, nrow = 1)
+```
+
+### 2.3 Análisis
+
+- La menor edad de los empleados es de 18 años y la edad maxima es de 60 años. La media y la mediana es de 36 años. La tercera parte de los empleados de la compañia tienen menos de 43 años.
+
+- Los empleados de la compañia viven en promedio a 7 Km del lugar del trabajo. El 25% de los empleados viven cerca de la compañia (menos de 2 Km), no obstante el 75% de los empleados viven a 14 Km del lugar de trabajo y existen personas que viven incluso a 29 Km.
+
+- Se evidencia que la compañia tiene empleados con experiencia para el cargo entre 10 y 11 años.El 75% de los empleados tienen menos de 15 años de experiencia y el empleado con mayor experiencia tiene 40 años.
+
+- En las graficas se puede evidenciar que la variable edad presenta una distribución normal, las demas variables tienen una distribucion asimetrica.
+
+- El 72% de los empleados refieren que no requieren de horas extras para cumplir con sus actividades laborales.
+
+- El 46% de los empleados de la compañia se encuentran casados, el 32% son solteros y el porcentaje restante se encuentran divorciados.
+
+- En la variable cargo se encuentran 9 categorias, de las cuales tres son directivos, cuatro de nivel intermedio y 1 operativo.El cargo con mas empleados es Ejecutivo de ventas (n=326) seguido de investigador cientifico (n=292) y tecnicos de laboratorio (n=259).
+
+***
+
+## 3. Análisis bivariado
+Realiza un análisis de bivariado en donde la variable respuesta sea rotacion codificada de la siguiente manera ```(y=1 es si rotación, y=0 es no rotación)```. Con base en estos resultados identifique cuales son las variables determinantes de la rotación e interpretar el signo del coeficiente estimado. Compare estos resultados con la hipotesis planteada en el punto 2.
+
+### 3.1 Variables Categóricas
+
+```{r D07, echo=TRUE}
+colores_rotacion <- c("#1E6BB8", "#04AA6D")
+ggplot(rotacion, aes(x = Horas_Extra, fill = Rotación)) + geom_bar() + 
+  scale_fill_manual(values = colores_rotacion)
+
+chisq.test(table(rotacion$Horas_Extra, rotacion$Rotación))
+```
+
+**Análisis:** Se rechaza hipotesis nula y se acepta hipotesis alterna, donde se evidencia que las Horas_Extra influye en la rotación del personal.
+
+```{r D08, echo=TRUE}
+ggplot(rotacion, aes(x = Estado_Civil, fill = Rotación)) + geom_bar() + 
+  scale_fill_manual(values = colores_rotacion)
+chisq.test(table(rotacion$Estado_Civil, rotacion$Rotación))
+```
+
+**Análisis:** Se rechaza hipotesis nula y se acepta hipotesis alterna, donde se evidencia que el Estado_Civil influye en la rotación del personal.
+
+```{r D09, echo=TRUE}
+ggplot(rotacion, aes(x = Cargo, fill = Rotación)) + geom_bar() + 
+  scale_fill_manual(values = colores_rotacion) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+chisq.test(table(rotacion$Cargo, rotacion$Rotación))
+```
+
+**Análisis:** Se rechaza hipotesis nula y se acepta hipotesis alterna, donde se evidencia que el Cargo influye en la rotación del personal.
+
+### 3.2 Variables Cuantitativas
+
+```{r D10, echo=TRUE}
+ggplot(rotacion,aes(x=Rotación,y=Edad,fill=Rotación)) + geom_boxplot()+theme_bw() + 
+  scale_fill_manual(values = colores_rotacion)
+t.test(rotacion$Edad ~ rotacion$Rotación)
+```
+
+**Análisis:** Se rechaza hipotesis nula y se acepta hipotesis alterna, donde se evidencia que la Edad influye en la rotación del personal.
+
+```{r D11, echo=TRUE}
+ggplot(rotacion,aes(x=Rotación,y=Años_Experiencia,fill=Rotación)) + geom_boxplot()+theme_bw() + 
+  scale_fill_manual(values = colores_rotacion)
+t.test(rotacion$Años_Experiencia ~ rotacion$Rotación)
+```
+
+**Análisis:** Se rechaza hipotesis nula y se acepta hipotesis alterna, donde se evidencia que los Años de Experiencia influye en la rotación del personal.
+
+```{r D12, echo=TRUE}
+ggplot(rotacion,aes(x=Rotación,y=Distancia_Casa,fill=Rotación)) + geom_boxplot()+theme_bw() + 
+  scale_fill_manual(values = colores_rotacion)
+t.test(rotacion$Distancia_Casa ~ rotacion$Rotación)
+```
+
+**Análisis:** Se rechaza hipotesis nula y se acepta hipotesis alterna, donde se evidencia que la Distancia del trabajo - casa influye en la rotación del personal.
+
+
+***
+
+
+## 4. Estimación del modelo
+
+Realiza la estimación de un modelo de regresión logístico en el cual la variable respuesta es rotacion ```(y=1 es si rotación, y=0 es no rotación)``` y las covariables las 6 seleccionadas en el punto 1. Interprete los coeficientes del modelo y la significancia de los parámetros.
+
+```{r D13, echo=TRUE}
+rotacion$Rotacion_nume <- ifelse(rotacion$Rotación == "Si", 1, 0)
+modelo <- glm(Rotacion_nume ~ Horas_Extra + Estado_Civil + Cargo + Edad + 
+                Años_Experiencia + Distancia_Casa, data = rotacion, family = "binomial")
+
+summary(modelo)
+
+exp(modelo$coefficients)
+```
+
+**Análisis:**
+
+Teniendo encuenta los resultados obtenidos del modelo de regresión logística, podemos concluir que las variables observadas están significativamente asociadas con la probabilidad de rotación de los empleados de la siguiente manera:
+
+- El número de horas extra realizadas por los empleados tiene un impacto significativo en la probabilidad de rotación, con un aumento en las horas extra asociado con una mayor probabilidad de rotación. 
+
+- El estado civil de los empleados también parece influir en la probabilidad de rotación, con empleados solteros mostrando una probabilidad significativamente mayor de rotación en comparación con los empleados casados, mientras que los empleados divorciados tienden a tener una probabilidad menor de rotación.
+
+- En relación a los cargos, como "Recursos Humanos" y "Representante de Ventas", están asociados con una mayor probabilidad de rotación en comparación con otros cargos. 
+
+- La distancia desde casa hasta el trabajo también juega un papel significativo, con un aumento en la distancia asociado con una mayor probabilidad de rotación. 
+
+***
+
+
+## 5. Evaluación
+
+Evaluar el poder predictivo del modelo con base en la curva ROC y el AUC.
+
+```{r D14, echo=TRUE}
+prob_pred <- predict(modelo, type = "response")
+roc_obj <- roc(rotacion$Rotacion_nume, prob_pred)
+auc <- auc(roc_obj)
+
+plot(roc_obj, main = "Curva ROC del modelo de regresión logística",
+     col = "#1E6BB8", lwd = 2, print.auc = TRUE)
+```
+
+**Análisis:** En este caso, un AUC de 0.788 sugiere que el modelo tiene una capacidad aceptable para predecir la rotación de los empleados en función de las variables predictoras incluidas en el modelo de regresión logística.
+
+***
+
+
+## 6. Predicciones
+
+Realiza una predicción la probabilidad de que un individuo (hipotético) rote y defina un corte para decidir si se debe intervenir a este empleado o no (posible estrategia para motivar al empleado).
+
+```{r D15, echo=TRUE}
+nuevo_empleado <- data.frame(Horas_Extra = "Si",
+                               Estado_Civil = "Soltero",
+                               Cargo = "Ejecutivo_Ventas",
+                               Edad = 35,
+                               Años_Experiencia = 4,
+                               Distancia_Casa = 15)
+
+prob_pred_nuevo <- predict(modelo, newdata = nuevo_empleado, type = "response")
+
+umbral <- 0.5
+
+if (prob_pred_nuevo > umbral) {
+  mensaje <- "Existe probabilidad de rotación. Se recomienda intervenir con 
+  el empleado para motivarlo."
+} else {
+  mensaje <- "No Existe la probabilidad de rotación. No es necesario intervenir con
+  el empleado en este momento."
+}
+
+cat(mensaje, prob_pred_nuevo)
+```
+
+***
+
+
+## 7. Conclusiones
+
+En las conclusiones adicione una discución sobre cuál sería la estrategia para disminuir la rotación en la empresa (con base en las variables que resultaron significativas en el punto 3).
+
+- El número de horas extra realizadas por los empleados tiene un impacto significativo en la probabilidad de rotación, con un aumento en las horas extra asociado con una mayor probabilidad de rotación.
+
+- El estado civil de los empleados también parece influir en la probabilidad de rotación, con empleados solteros mostrando una probabilidad significativamente mayor de rotación en comparación con los empleados casados, mientras que los empleados divorciados tienden a tener una probabilidad menor de rotación.
+
+- En relación a los cargos, aquellos como "Recursos Humanos" y "Representante de Ventas" están asociados con una mayor probabilidad de rotación en comparación con otros cargos.
+
+- La distancia desde casa hasta el trabajo también juega un papel significativo, con un aumento en la distancia asociado con una mayor probabilidad de rotación.
+
+***
+
+
+
+## 8. Anexos
+
+Código fuente --> [Clic Aquí](https://raw.githubusercontent.com/aperezn298/METDAct02/main/Actividad02.Rmd)
+
+***
+
+
+## 9. Autor
+
+*Alvaro Perez Niño – Estudiante*
+
+Maestría en Ciencia de Datos
+
+Universidad Javeriana - Cali
+
+**Código:** 8986470
+
+**Email:** aperezn892@javerianacali.edu.co
